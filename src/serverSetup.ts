@@ -262,8 +262,8 @@ if [[ ! -d $SERVER_DIR ]]; then
     fi
 fi
 
-# Check if server script is already installed
-if [[ ! -f $SERVER_SCRIPT ]]; then
+# Check for platform and architecture, and set them as global variables
+check_and_set_platform_arch() {
     # Check if platform is supported
     KERNEL="$(uname -s)"
     case $KERNEL in
@@ -280,8 +280,10 @@ if [[ ! -f $SERVER_SCRIPT ]]; then
             PLATFORM="dragonfly"
             ;;
         *)
-            echo "Error platform not supported: $KERNEL"
-            print_install_results_and_exit 1
+            if [ -z "$DONT_FAIL_ON_UNSUPPORTED" ]; then
+                echo "Error platform not supported: $KERNEL"
+                print_install_results_and_exit 1
+            fi
             ;;
     esac
 
@@ -300,15 +302,18 @@ if [[ ! -f $SERVER_SCRIPT ]]; then
         ppc64le)
             SERVER_ARCH="ppc64le"
             ;;
-        riscv64)
-            SERVER_ARCH="riscv64"
-            ;;
         *)
-            echo "Error architecture not supported: $ARCH"
-            print_install_results_and_exit 1
+            if [ -z "$DONT_FAIL_ON_UNSUPPORTED" ]; then
+                echo "Error architecture not supported: $ARCH"
+                print_install_results_and_exit 1
+            fi
             ;;
     esac
+}
 
+# Check if server script is already installed
+if [[ ! -f $SERVER_SCRIPT ]]; then
+    check_and_set_platform_arch
     SERVER_DOWNLOAD_URL="$(echo "${serverDownloadUrlTemplate.replace(/\$\{/g, '\\${')}" | sed "s/\\\${quality}/$DISTRO_QUALITY/g" | sed "s/\\\${version}/$DISTRO_VERSION/g" | sed "s/\\\${commit}/$DISTRO_COMMIT/g" | sed "s/\\\${os}/$PLATFORM/g" | sed "s/\\\${arch}/$SERVER_ARCH/g" | sed "s/\\\${release}/$DISTRO_VSCODIUM_RELEASE/g")"
 
     if [[ "$PLATFORM" != "darwin" ]] && [[ "$PLATFORM" != "linux" ]]; then
@@ -347,6 +352,8 @@ if [[ ! -f $SERVER_SCRIPT ]]; then
 
     popd > /dev/null
 else
+    DONT_FAIL_ON_UNSUPPORTED=1
+    check_and_set_platform_arch
     echo "Server script already installed in $SERVER_SCRIPT"
 fi
 
